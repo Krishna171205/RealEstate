@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createClient } from '@supabase/supabase-js';
+import { FUNCTION_BASE, HEADERS, callFunction } from '../../lib/api';
+
 
 const supabase = createClient(
   import.meta.env.VITE_PUBLIC_SUPABASE_URL,
@@ -108,9 +110,7 @@ const AdminDashboard = () => {
       console.log('Loading properties from database...')
       const response = await fetch(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/manage-properties`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: HEADERS
       });
       
       if (response.ok) {
@@ -134,9 +134,7 @@ const AdminDashboard = () => {
       console.log('Loading consultations from database...')
       const response = await fetch(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/manage-consultations`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: HEADERS
       });
       
       if (response.ok) {
@@ -163,11 +161,9 @@ const AdminDashboard = () => {
     try {
       console.log('Adding new property:', newProperty);
       
-      const response = await fetch(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/manage-properties`, {
+      const response = await fetch(`${FUNCTION_BASE}/manage-properties`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: HEADERS,
         body: JSON.stringify({
           title: newProperty.title,
           location: newProperty.location,
@@ -181,8 +177,9 @@ const AdminDashboard = () => {
           garage: Number(newProperty.garage) || 1,
           description: newProperty.description,
           isRental: Boolean(newProperty.is_rental)
-        }),
+        })
       });
+
 
       if (response.ok) {
         const result = await response.json();
@@ -228,11 +225,9 @@ const AdminDashboard = () => {
     try {
       console.log('Updating property:', selectedProperty);
       
-      const response = await fetch(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/manage-properties`, {
+      const response = await fetch(`${FUNCTION_BASE}/manage-properties`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: HEADERS,
         body: JSON.stringify({
           id: selectedProperty.id,
           title: selectedProperty.title,
@@ -247,8 +242,9 @@ const AdminDashboard = () => {
           garage: Number(selectedProperty.garage) || 1,
           description: selectedProperty.description,
           isRental: Boolean(selectedProperty.is_rental)
-        }),
+        })
       });
+
 
       if (response.ok) {
         const result = await response.json();
@@ -274,47 +270,29 @@ const AdminDashboard = () => {
   };
 
   const handleDeleteProperty = async (id: number) => {
-    const property = properties.find(p => p.id === id);
-    
-    // Create a custom confirmation modal instead of using window.confirm
-    if (!window.confirm(`Are you sure you want to delete "${property?.title || 'this property'}"?\n\nThis action cannot be undone.`)) {
-      return;
-    }
+  if (!window.confirm('Are you sure you want to permanently delete this property?')) return;
 
-    setIsSubmitting(true);
-    
-    try {
-      console.log('Deleting property with ID:', id);
-      
-      const response = await fetch(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/manage-properties`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ id: Number(id) }),
-      });
+  setIsSubmitting(true);
+  try {
+    const response = await fetch(`${FUNCTION_BASE}/manage-properties`, {
+      method: 'DELETE',
+      headers: HEADERS,
+      body: JSON.stringify({ id })
+    });
 
-      if (response.ok) {
-        console.log('Property deleted successfully');
-        
-        // Immediately update local state
-        setProperties(prevProperties => prevProperties.filter(p => p.id !== id));
-        
-        // Show success feedback
-        alert('Property deleted successfully!');
-        
-      } else {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('Error deleting property:', errorData);
-        alert(`Error deleting property: ${errorData.error || 'Please try again'}`);
-      }
-    } catch (error) {
-      console.error('Network error while deleting property:', error);
-      alert('Error deleting property. Please check your connection and try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data?.error || data?.message || 'Delete failed');
+
+    setProperties(prev => prev.filter(p => p.id !== id));
+    alert('Property deleted successfully');
+  } catch (err: any) {
+    console.error('Delete error:', err);
+    alert('Delete failed: ' + (err.message || err));
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
 
   const handleDeleteConsultation = async (id: number) => {
     const consultation = consultations.find(c => c.id === id);

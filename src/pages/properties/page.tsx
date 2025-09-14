@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { FUNCTION_BASE, HEADERS } from '../../lib/api';
+
 
 interface Property {
   id: number;
@@ -13,6 +15,7 @@ interface Property {
   sqft: number;
   is_rental?: boolean;
   image_url: string;
+  area?: string;
 }
 
 const Properties = () => {
@@ -20,6 +23,7 @@ const Properties = () => {
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState('all');
+  const [filterArea, setFilterArea] = useState('all');
   const [priceRange, setPriceRange] = useState('all');
   const [sortBy, setSortBy] = useState('price_desc');
 
@@ -34,9 +38,7 @@ const Properties = () => {
       
       const response = await fetch(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/get-properties`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: HEADERS,
       });
       
       if (response.ok) {
@@ -79,6 +81,10 @@ const Properties = () => {
 
   const filteredProperties = properties.filter(property => {
     if (filterType !== 'all' && property.type.toLowerCase() !== filterType.toLowerCase()) {
+      return false;
+    }
+    
+    if (filterArea !== 'all' && property.area !== filterArea) {
       return false;
     }
     
@@ -187,6 +193,28 @@ const Properties = () => {
               </select>
             </div>
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Area</label>
+              <select 
+                value={filterArea} 
+                onChange={(e) => setFilterArea(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-8"
+              >
+                <option value="all">All Areas</option>
+                <option value="Downtown">Downtown</option>
+                <option value="Beverly Hills">Beverly Hills</option>
+                <option value="Hollywood">Hollywood</option>
+                <option value="Santa Monica">Santa Monica</option>
+                <option value="Venice">Venice</option>
+                <option value="Malibu">Malibu</option>
+                <option value="Pasadena">Pasadena</option>
+                <option value="West Hollywood">West Hollywood</option>
+                <option value="Manhattan Beach">Manhattan Beach</option>
+                <option value="Hermosa Beach">Hermosa Beach</option>
+                <option value="Culver City">Culver City</option>
+                <option value="Brentwood">Brentwood</option>
+              </select>
+            </div>
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Price Range</label>
               <select 
                 value={priceRange} 
@@ -251,6 +279,7 @@ const Properties = () => {
                   <p className="text-gray-600 mb-4 flex items-center">
                     <i className="ri-map-pin-line mr-2 w-4 h-4 flex items-center justify-center"></i>
                     {property.location}
+                    {property.area && <span className="ml-2 text-blue-600 font-medium">• {property.area}</span>}
                   </p>
                   <div className="flex justify-between items-center mb-4">
                     <div className="text-2xl font-bold text-blue-600">

@@ -2,7 +2,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS'
 }
 
 const generateImageUrl = (title: string, type: string) => {
@@ -21,17 +22,29 @@ const generateImageUrl = (title: string, type: string) => {
 }
 
 Deno.serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    // Use service role key for admin operations to bypass RLS
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    // Initialize Supabase client with service role key for admin operations
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error('Missing Supabase configuration')
+      return new Response(JSON.stringify({ 
+        error: 'Server configuration error' 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
 
+    const supabaseClient = createClient(supabaseUrl, serviceRoleKey)
+
+    // GET - Fetch all properties
     if (req.method === 'GET') {
       console.log('Admin: Fetching all properties for management...')
       
@@ -61,6 +74,7 @@ Deno.serve(async (req) => {
       })
     }
 
+    // POST - Add new property
     if (req.method === 'POST') {
       const body = await req.json()
       console.log('Admin: Adding new property with data:', body)
@@ -92,6 +106,7 @@ Deno.serve(async (req) => {
         garage: Math.max(0, parseInt(body.garage) || 1),
         description: String(body.description).trim(),
         is_rental: Boolean(body.isRental),
+        area: String(body.area || '').trim(),
         image_url: imageUrl,
         image: imageUrl
       }
@@ -126,6 +141,7 @@ Deno.serve(async (req) => {
       })
     }
 
+    // PUT - Update existing property
     if (req.method === 'PUT') {
       const body = await req.json()
       console.log('Admin: Updating property with data:', body)
@@ -141,14 +157,14 @@ Deno.serve(async (req) => {
       }
       
       // First check if property exists
-      const { data: existingProperty } = await supabaseClient
+      const { data: existingProperty, error: fetchError } = await supabaseClient
         .from('properties')
         .select('*')
         .eq('id', body.id)
         .single()
 
-      if (!existingProperty) {
-        console.error('Admin: Property not found for update, ID:', body.id)
+      if (fetchError || !existingProperty) {
+        console.error('Admin: Property not found for update, ID:', body.id, fetchError)
         return new Response(JSON.stringify({ 
           error: 'Property not found' 
         }), {
@@ -171,7 +187,8 @@ Deno.serve(async (req) => {
         sqft: Math.max(500, parseInt(body.sqft) || existingProperty.sqft),
         garage: Math.max(0, parseInt(body.garage) || existingProperty.garage),
         description: String(body.description || existingProperty.description).trim(),
-        is_rental: Boolean(body.isRental !== undefined ? body.isRental : existingProperty.is_rental)
+        is_rental: Boolean(body.isRental !== undefined ? body.isRental : existingProperty.is_rental),
+        area: String(body.area !== undefined ? body.area : existingProperty.area || '').trim()
       }
       
       // Generate new image if title or type changed
@@ -213,43 +230,64 @@ Deno.serve(async (req) => {
       })
     }
 
+    // DELETE - Remove property
     if (req.method === 'DELETE') {
       const body = await req.json()
-      console.log('Admin: Attempting to delete property with ID:', body.id)
+      const propertyId = body.id || body.propertyId
       
-      if (!body.id) {
-        console.error('Admin: Missing property ID for deletion')
+      console.log('Admin: DELETE request received with body:', body)
+      console.log('Admin: Attempting to delete property with ID:', propertyId)
+      
+      if (!propertyId || isNaN(parseInt(propertyId))) {
+        console.error('Admin: Invalid or missing property ID for deletion:', propertyId)
         return new Response(JSON.stringify({ 
-          error: 'Property ID is required for deletion' 
+          error: 'Valid property ID is required for deletion',
+          receivedId: propertyId
         }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
       }
       
-      // First get the property to return it in response and verify it exists
+      const numericId = parseInt(propertyId)
+      console.log('Admin: Parsed property ID as numeric:', numericId)
+      
+      // First verify the property exists
       const { data: propertyToDelete, error: fetchError } = await supabaseClient
         .from('properties')
         .select('*')
-        .eq('id', body.id)
-        .single()
+        .eq('id', numericId)
+        .maybeSingle()
 
-      if (fetchError || !propertyToDelete) {
-        console.error('Admin: Property not found for deletion, ID:', body.id, fetchError)
+      if (fetchError) {
+        console.error('Admin: Error checking property existence:', fetchError)
         return new Response(JSON.stringify({ 
-          error: 'Property not found' 
+          error: 'Database error while checking property',
+          details: fetchError.message 
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
+      if (!propertyToDelete) {
+        console.error('Admin: Property not found for deletion, ID:', numericId)
+        return new Response(JSON.stringify({ 
+          error: 'Property not found with the specified ID',
+          searchedId: numericId
         }), {
           status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
       }
 
-      console.log('Admin: Found property to delete:', propertyToDelete.title)
+      console.log('Admin: Found property to delete:', propertyToDelete.title, 'ID:', propertyToDelete.id)
       
+      // Perform the deletion
       const { error: deleteError } = await supabaseClient
         .from('properties')
         .delete()
-        .eq('id', body.id)
+        .eq('id', numericId)
 
       if (deleteError) {
         console.error('Admin: Delete property error:', deleteError)
@@ -267,13 +305,20 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ 
         success: true, 
         message: 'Property deleted successfully',
-        deletedProperty: propertyToDelete 
+        deletedProperty: {
+          id: propertyToDelete.id,
+          title: propertyToDelete.title
+        }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), { 
+    // Method not allowed
+    return new Response(JSON.stringify({ 
+      error: 'Method not allowed',
+      allowedMethods: ['GET', 'POST', 'PUT', 'DELETE']
+    }), { 
       status: 405, 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
@@ -282,7 +327,8 @@ Deno.serve(async (req) => {
     console.error('Admin manage properties function error:', error)
     return new Response(JSON.stringify({ 
       error: 'Internal server error',
-      details: error.message
+      details: error.message,
+      stack: error.stack
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

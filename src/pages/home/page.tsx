@@ -13,6 +13,7 @@ interface Property {
   sqft: number;
   is_rental?: boolean;
   image_url: string;
+  area?: string;
 }
 
 const Home = () => {
@@ -363,6 +364,7 @@ const Home = () => {
                       <p className="text-gray-600 mb-4 flex items-center">
                         <i className="ri-map-pin-line mr-2 w-4 h-4 flex items-center justify-center"></i>
                         {property.location}
+                        {property.area && <span className="ml-2 text-blue-600 font-medium">• {property.area}</span>}
                       </p>
                       <div className="flex justify-between items-center mb-4">
                         <div className="text-2xl font-bold text-blue-600">
