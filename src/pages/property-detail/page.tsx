@@ -1,8 +1,6 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { FUNCTION_BASE, HEADERS } from '../../lib/api';
-
 
 interface Property {
   id: number;
@@ -54,10 +52,7 @@ const PropertyDetail = () => {
 
   const loadProperty = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/get-properties`,{
-      method: 'GET',
-        headers: HEADERS
-  });
+      const response = await fetch(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/get-properties`);
       
       if (response.ok) {
         const data = await response.json();

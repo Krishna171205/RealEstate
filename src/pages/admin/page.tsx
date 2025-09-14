@@ -1,8 +1,7 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createClient } from '@supabase/supabase-js';
-import { FUNCTION_BASE, HEADERS, callFunction } from '../../lib/api';
-
 
 const supabase = createClient(
   import.meta.env.VITE_PUBLIC_SUPABASE_URL,
@@ -24,6 +23,7 @@ interface Property {
   description: string;
   is_rental?: boolean;
   image_url: string;
+  area?: string;
   created_at: string;
 }
 
@@ -65,7 +65,8 @@ const AdminDashboard = () => {
     sqft: 1000,
     garage: 1,
     description: '',
-    is_rental: false
+    is_rental: false,
+    area: ''
   });
 
   useEffect(() => {
@@ -110,7 +111,9 @@ const AdminDashboard = () => {
       console.log('Loading properties from database...')
       const response = await fetch(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/manage-properties`, {
         method: 'GET',
-        headers: HEADERS
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
       
       if (response.ok) {
@@ -134,7 +137,9 @@ const AdminDashboard = () => {
       console.log('Loading consultations from database...')
       const response = await fetch(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/manage-consultations`, {
         method: 'GET',
-        headers: HEADERS
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
       
       if (response.ok) {
@@ -161,9 +166,11 @@ const AdminDashboard = () => {
     try {
       console.log('Adding new property:', newProperty);
       
-      const response = await fetch(`${FUNCTION_BASE}/manage-properties`, {
+      const response = await fetch(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/manage-properties`, {
         method: 'POST',
-        headers: HEADERS,
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           title: newProperty.title,
           location: newProperty.location,
@@ -176,10 +183,10 @@ const AdminDashboard = () => {
           sqft: Number(newProperty.sqft) || 1000,
           garage: Number(newProperty.garage) || 1,
           description: newProperty.description,
-          isRental: Boolean(newProperty.is_rental)
-        })
+          isRental: Boolean(newProperty.is_rental),
+          area: newProperty.area || ''
+        }),
       });
-
 
       if (response.ok) {
         const result = await response.json();
@@ -201,7 +208,8 @@ const AdminDashboard = () => {
           sqft: 1000,
           garage: 1,
           description: '',
-          is_rental: false
+          is_rental: false,
+          area: ''
         });
         setShowAddProperty(false);
         alert('Property added successfully!');
@@ -225,9 +233,11 @@ const AdminDashboard = () => {
     try {
       console.log('Updating property:', selectedProperty);
       
-      const response = await fetch(`${FUNCTION_BASE}/manage-properties`, {
+      const response = await fetch(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/manage-properties`, {
         method: 'PUT',
-        headers: HEADERS,
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           id: selectedProperty.id,
           title: selectedProperty.title,
@@ -241,10 +251,10 @@ const AdminDashboard = () => {
           sqft: Number(selectedProperty.sqft) || 1000,
           garage: Number(selectedProperty.garage) || 1,
           description: selectedProperty.description,
-          isRental: Boolean(selectedProperty.is_rental)
-        })
+          isRental: Boolean(selectedProperty.is_rental),
+          area: selectedProperty.area || ''
+        }),
       });
-
 
       if (response.ok) {
         const result = await response.json();
@@ -270,29 +280,64 @@ const AdminDashboard = () => {
   };
 
   const handleDeleteProperty = async (id: number) => {
-  if (!window.confirm('Are you sure you want to permanently delete this property?')) return;
+    const property = properties.find(p => p.id === id);
+    
+    if (!window.confirm(`Are you sure you want to delete "${property?.title || 'this property'}"?\n\nThis action cannot be undone.`)) {
+      return;
+    }
 
-  setIsSubmitting(true);
-  try {
-    const response = await fetch(`${FUNCTION_BASE}/manage-properties`, {
-      method: 'DELETE',
-      headers: HEADERS,
-      body: JSON.stringify({ id })
-    });
+    setIsSubmitting(true);
+    
+    try {
+      console.log('Deleting property with ID:', id);
+      
+      const response = await fetch(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/manage-properties`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ id: Number(id) }),
+      });
 
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data?.error || data?.message || 'Delete failed');
-
-    setProperties(prev => prev.filter(p => p.id !== id));
-    alert('Property deleted successfully');
-  } catch (err: any) {
-    console.error('Delete error:', err);
-    alert('Delete failed: ' + (err.message || err));
-  } finally {
-    setIsSubmitting(false);
-  }
-};
-
+      if (response.ok) {
+        console.log('Property deleted successfully');
+        
+        // Immediately update local state
+        setProperties(prevProperties => prevProperties.filter(p => p.id !== id));
+        
+        // Show success feedback
+        alert('Property deleted successfully!');
+        
+      } else {
+        // Handle HTTP errors
+        let errorMessage = 'Unknown error occurred';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorData.message || `HTTP ${response.status}: ${response.statusText}`;
+        } catch (parseError) {
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+        
+        console.error('Error deleting property:', errorMessage);
+        alert(`Error deleting property: ${errorMessage}`);
+      }
+    } catch (error) {
+      // Handle network and other errors
+      console.error('Network error while deleting property:', error);
+      
+      let errorMessage = 'Network connection failed. Please check your internet connection and try again.';
+      if (error instanceof Error) {
+        errorMessage = error.message.includes('fetch') 
+          ? 'Network connection failed. Please check your internet connection and try again.'
+          : `Error: ${error.message}`;
+      }
+      
+      alert(`Error deleting property: ${errorMessage}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleDeleteConsultation = async (id: number) => {
     const consultation = consultations.find(c => c.id === id);
@@ -310,6 +355,7 @@ const AdminDashboard = () => {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`,
         },
         body: JSON.stringify({ id: Number(id) }),
       });
@@ -324,13 +370,30 @@ const AdminDashboard = () => {
         alert('Consultation deleted successfully!');
         
       } else {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('Error deleting consultation:', errorData);
-        alert(`Error deleting consultation: ${errorData.error || 'Please try again'}`);
+        // Handle HTTP errors
+        let errorMessage = 'Unknown error occurred';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorData.message || `HTTP ${response.status}: ${response.statusText}`;
+        } catch (parseError) {
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+        
+        console.error('Error deleting consultation:', errorMessage);
+        alert(`Error deleting consultation: ${errorMessage}`);
       }
     } catch (error) {
+      // Handle network and other errors
       console.error('Network error while deleting consultation:', error);
-      alert('Error deleting consultation. Please check your connection and try again.');
+      
+      let errorMessage = 'Network connection failed. Please check your internet connection and try again.';
+      if (error instanceof Error) {
+        errorMessage = error.message.includes('fetch') 
+          ? 'Network connection failed. Please check your internet connection and try again.'
+          : `Error: ${error.message}`;
+      }
+      
+      alert(`Error deleting consultation: ${errorMessage}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -486,6 +549,7 @@ const AdminDashboard = () => {
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Property</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Area</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
@@ -510,6 +574,9 @@ const AdminDashboard = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {property.location}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {property.area || 'Not specified'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           {formatPrice(property.price, property.is_rental)}
@@ -808,6 +875,28 @@ const AdminDashboard = () => {
                   <span className="text-sm font-medium text-gray-700">This is a rental property (price per month)</span>
                 </label>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Area/District</label>
+                <select 
+                  value={newProperty.area}
+                  onChange={(e) => setNewProperty({...newProperty, area: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm pr-8"
+                >
+                  <option value="">Select Area</option>
+                  <option value="Downtown">Downtown</option>
+                  <option value="Beverly Hills">Beverly Hills</option>
+                  <option value="Hollywood">Hollywood</option>
+                  <option value="Santa Monica">Santa Monica</option>
+                  <option value="Venice">Venice</option>
+                  <option value="Malibu">Malibu</option>
+                  <option value="Pasadena">Pasadena</option>
+                  <option value="West Hollywood">West Hollywood</option>
+                  <option value="Manhattan Beach">Manhattan Beach</option>
+                  <option value="Hermosa Beach">Hermosa Beach</option>
+                  <option value="Culver City">Culver City</option>
+                  <option value="Brentwood">Brentwood</option>
+                </select>
+              </div>
             </div>
             
             <div className="flex justify-end space-x-4 mt-6">
@@ -862,6 +951,15 @@ const AdminDashboard = () => {
                 />
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Full Address</label>
+                <input 
+                  type="text"
+                  value={selectedProperty.full_address}
+                  onChange={(e) => setSelectedProperty({...selectedProperty, full_address: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm" 
+                />
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Price</label>
                 <input 
                   type="number"
@@ -869,6 +967,22 @@ const AdminDashboard = () => {
                   onChange={(e) => setSelectedProperty({...selectedProperty, price: parseInt(e.target.value)})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm" 
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Property Type</label>
+                <select 
+                  value={selectedProperty.type}
+                  onChange={(e) => setSelectedProperty({...selectedProperty, type: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm pr-8"
+                >
+                  <option value="House">House</option>
+                  <option value="Condo">Condo</option>
+                  <option value="Duplex">Duplex</option>
+                  <option value="Penthouse">Penthouse</option>
+                  <option value="Estate">Estate</option>
+                  <option value="Townhouse">Townhouse</option>
+                  <option value="Loft">Loft</option>
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
@@ -882,6 +996,46 @@ const AdminDashboard = () => {
                   <option value="Investment">Investment</option>
                 </select>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Bedrooms</label>
+                <input 
+                  type="number"
+                  value={selectedProperty.beds}
+                  onChange={(e) => setSelectedProperty({...selectedProperty, beds: parseInt(e.target.value)})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm" 
+                  min="1"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Bathrooms</label>
+                <input 
+                  type="number"
+                  value={selectedProperty.baths}
+                  onChange={(e) => setSelectedProperty({...selectedProperty, baths: parseInt(e.target.value)})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm" 
+                  min="1"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Square Feet</label>
+                <input 
+                  type="number"
+                  value={selectedProperty.sqft}
+                  onChange={(e) => setSelectedProperty({...selectedProperty, sqft: parseInt(e.target.value)})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm" 
+                  min="500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Garage Spaces</label>
+                <input 
+                  type="number"
+                  value={selectedProperty.garage}
+                  onChange={(e) => setSelectedProperty({...selectedProperty, garage: parseInt(e.target.value)})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm" 
+                  min="0"
+                />
+              </div>
               <div className="col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                 <textarea 
@@ -891,20 +1045,55 @@ const AdminDashboard = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm" 
                 />
               </div>
+              <div className="col-span-2">
+                <label className="flex items-center">
+                  <input 
+                    type="checkbox"
+                    checked={selectedProperty.is_rental}
+                    onChange={(e) => setSelectedProperty({...selectedProperty, is_rental: e.target.checked})}
+                    className="mr-2"
+                  />
+                  <span className="text-sm font-medium text-gray-700">This is a rental property (price per month)</span>
+                </label>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Area/District</label>
+                <select 
+                  value={selectedProperty.area || ''}
+                  onChange={(e) => setSelectedProperty({...selectedProperty, area: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm pr-8"
+                >
+                  <option value="">Select Area</option>
+                  <option value="Downtown">Downtown</option>
+                  <option value="Beverly Hills">Beverly Hills</option>
+                  <option value="Hollywood">Hollywood</option>
+                  <option value="Santa Monica">Santa Monica</option>
+                  <option value="Venice">Venice</option>
+                  <option value="Malibu">Malibu</option>
+                  <option value="Pasadena">Pasadena</option>
+                  <option value="West Hollywood">West Hollywood</option>
+                  <option value="Manhattan Beach">Manhattan Beach</option>
+                  <option value="Hermosa Beach">Hermosa Beach</option>
+                  <option value="Culver City">Culver City</option>
+                  <option value="Brentwood">Brentwood</option>
+                </select>
+              </div>
             </div>
             
             <div className="flex justify-end space-x-4 mt-6">
               <button 
                 onClick={() => setShowEditProperty(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 cursor-pointer whitespace-nowrap"
+                disabled={isSubmitting}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
               <button 
                 onClick={handleEditProperty}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg cursor-pointer whitespace-nowrap"
+                disabled={isSubmitting}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Save Changes
+                {isSubmitting ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </div>
