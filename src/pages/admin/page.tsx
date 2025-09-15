@@ -43,7 +43,7 @@ interface Consultation {
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  const [setUser] = useState<any>(null);
+  const [user,setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('properties');
   const [showAddProperty, setShowAddProperty] = useState(false);
