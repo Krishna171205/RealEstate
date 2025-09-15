@@ -69,6 +69,9 @@ export default defineConfig({
   build: {
     sourcemap: true,
     outDir: 'out',
+    rollupOptions:{
+      external:['preview-inject'],
+    },
   },
   resolve: {
     alias: {
@@ -78,5 +81,8 @@ export default defineConfig({
   server: {
     port: 3000,
     host: '0.0.0.0',
-  }
+  },
+  optimizeDeps:{
+    exclude: ['preview-inject'],
+  },
 })
