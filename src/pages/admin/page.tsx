@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createClient } from '@supabase/supabase-js';
 
+
 const supabase = createClient(
   import.meta.env.VITE_PUBLIC_SUPABASE_URL,
   import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY
@@ -42,7 +43,7 @@ interface Consultation {
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  const [user, setUser] = useState<any>(null);
+  const [setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('properties');
   const [showAddProperty, setShowAddProperty] = useState(false);
