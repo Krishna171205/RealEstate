@@ -37,7 +37,7 @@ const PropertyDetail = () => {
 
   // Generate multiple image views for property
   const generatePropertyImages = (property: Property) => {
-    const baseQuery = `${property.type.toLowerCase()} property`;
+    // const baseQuery = `${property.type.toLowerCase()} property`;
     return [
       property.image_url,
       `https://readdy.ai/api/search-image?query=$%7BbaseQuery%7D%20interior%20living%20room%2C%20modern%20design%2C%20spacious%20layout%2C%20natural%20lighting&width=800&height=500&seq=detail${property.id}a&orientation=landscape`,
