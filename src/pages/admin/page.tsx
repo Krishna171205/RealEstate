@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createClient } from '@supabase/supabase-js';
 
-
 const supabase = createClient(
   import.meta.env.VITE_PUBLIC_SUPABASE_URL,
   import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY
@@ -43,7 +42,7 @@ interface Consultation {
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  const [setUser] = useState<any>(null);
+  const [_user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('properties');
   const [showAddProperty, setShowAddProperty] = useState(false);
@@ -78,16 +77,7 @@ const AdminDashboard = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
-      // Check for demo session if no authenticated user
       if (!user) {
-        const demoSession = localStorage.getItem('demo_admin_session');
-        if (demoSession) {
-          const demoUser = JSON.parse(demoSession);
-          setUser(demoUser);
-          loadData();
-          setLoading(false);
-          return;
-        }
         // Redirect to login page if not authenticated
         navigate('/admin/login');
         return;
@@ -428,8 +418,6 @@ const AdminDashboard = () => {
 
   const handleSignOut = async () => {
     try {
-      // Clear demo session
-      localStorage.removeItem('demo_admin_session');
       await supabase.auth.signOut();
     } catch (error) {
       console.error('Sign out error:', error);
@@ -831,8 +819,10 @@ const AdminDashboard = () => {
                   type="number"
                   value={newProperty.baths}
                   onChange={(e) => setNewProperty({...newProperty, baths: parseInt(e.target.value)})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm" 
-                  min="1"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-5
+
+                text-sm" 
+                min="1"
                 />
               </div>
               <div>
@@ -878,25 +868,13 @@ const AdminDashboard = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Area/District</label>
-                <select 
+                <input 
+                  type="text"
                   value={newProperty.area}
                   onChange={(e) => setNewProperty({...newProperty, area: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm pr-8"
-                >
-                  <option value="">Select Area</option>
-                  <option value="Downtown">Downtown</option>
-                  <option value="Beverly Hills">Beverly Hills</option>
-                  <option value="Hollywood">Hollywood</option>
-                  <option value="Santa Monica">Santa Monica</option>
-                  <option value="Venice">Venice</option>
-                  <option value="Malibu">Malibu</option>
-                  <option value="Pasadena">Pasadena</option>
-                  <option value="West Hollywood">West Hollywood</option>
-                  <option value="Manhattan Beach">Manhattan Beach</option>
-                  <option value="Hermosa Beach">Hermosa Beach</option>
-                  <option value="Culver City">Culver City</option>
-                  <option value="Brentwood">Brentwood</option>
-                </select>
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm" 
+                  placeholder="Enter area (e.g., Downtown, Beverly Hills, etc.)"
+                />
               </div>
             </div>
             
@@ -1059,25 +1037,13 @@ const AdminDashboard = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Area/District</label>
-                <select 
+                <input 
+                  type="text"
                   value={selectedProperty.area || ''}
                   onChange={(e) => setSelectedProperty({...selectedProperty, area: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm pr-8"
-                >
-                  <option value="">Select Area</option>
-                  <option value="Downtown">Downtown</option>
-                  <option value="Beverly Hills">Beverly Hills</option>
-                  <option value="Hollywood">Hollywood</option>
-                  <option value="Santa Monica">Santa Monica</option>
-                  <option value="Venice">Venice</option>
-                  <option value="Malibu">Malibu</option>
-                  <option value="Pasadena">Pasadena</option>
-                  <option value="West Hollywood">West Hollywood</option>
-                  <option value="Manhattan Beach">Manhattan Beach</option>
-                  <option value="Hermosa Beach">Hermosa Beach</option>
-                  <option value="Culver City">Culver City</option>
-                  <option value="Brentwood">Brentwood</option>
-                </select>
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm" 
+                  placeholder="Enter area (e.g., Downtown, Beverly Hills, etc.)"
+                />
               </div>
             </div>
             
